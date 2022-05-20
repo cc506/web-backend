@@ -22,7 +22,7 @@ def get_db2():
         db2.row_factory = sqlite3.Row
         yield db2
 
-# Posting a win or loss for a particular game, along with a timestamp and number of guesses.
+# Posting a u or loss for a particular game, along with a timestamp and number of guesses.
 @app.post("/games")
 def add_game(game: Game, db: sqlite3.Connection = Depends(get_db), 
              db1: sqlite3.Connection = Depends(get_db1), db2: sqlite3.Connection = Depends(get_db2)):
@@ -136,6 +136,87 @@ def get_statistics(user_id: str, db: sqlite3.Connection = Depends(get_db),
         wins = cur.fetchall()
         
         return {"Stats": stats, "Streak": streak, "Wins": wins}
+    
+# Retrieving the user.
+@app.get("/uuid/{user}")
+def get_uuid(user: str, db: sqlite3.Connection = Depends(get_db), 
+                   db1: sqlite3.Connection = Depends(get_db1), db2: sqlite3.Connection = Depends(get_db2)):
+    user_list = []
+     
+    cur = db.execute(
+        """
+        SELECT user_id FROM users WHERE username = ?
+        """,
+        ([user])
+    )
+    users = cur.fetchall()
+    for u in users:
+        user_list.append(u)
+    users.clear()
+
+    cur = db1.execute(
+        """
+        SELECT user_id FROM users WHERE username = ?
+        """,
+        ([user])
+    )
+    users = cur.fetchall()
+    for u in users:
+        user_list.append(u)
+    users.clear()
+
+    cur = db2.execute(
+        """
+        SELECT user_id FROM users WHERE username = ?
+        """,
+        ([user])
+    )
+    users = cur.fetchall()
+    for u in users:
+        user_list.append(u)
+    users.clear()
+    
+    
+    if not user_list:
+        
+        user_id = uuid.uuid4()
+        print(user_id)
+        shard_key = int(user_id) % (3)
+        user_id = str(user_id)
+        print(user_id)
+        
+        if shard_key == 0:
+            cur = db.execute(
+                """
+                INSERT into users (user_id, username) VALUES (?, ?)
+                """,
+                (user_id, user))
+            db.commit()
+            
+            return {"user_id": user_id}
+        
+        elif shard_key == 1:
+            cur = db1.execute(
+                """
+                INSERT into users (user_id, username) VALUES (?, ?)
+                """,
+                (user_id, user))
+            db1.commit()
+            
+            return {"user_id": user_id}
+        
+        elif shard_key == 2:
+            cur = db2.execute(
+                """
+                INSERT into users (user_id, username) VALUES (?, ?)
+                """,
+                (user_id, user))
+            db2.commit()
+            
+            return {"user_id": user_id}
+    else:
+        
+        return user_list[0]
 
 # Retrieving the top 10 users by number of wins
 @app.get("/top10wins")
